@@ -22,6 +22,8 @@ export default function AdminLogin() {
       const result = await adminLogin(username.trim(), password)
       setMsg(result.msg)
       if (result.ok) navigate('/admin')
+    } catch {
+      setMsg('网络连接失败，请稍后重试')
     } finally {
       setLoading(false)
     }

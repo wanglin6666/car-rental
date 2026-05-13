@@ -26,6 +26,8 @@ export default function Login() {
       const result = await login(phone.trim(), password)
       setMsg(result.msg)
       if (result.ok) navigate('/')
+    } catch {
+      setMsg('网络连接失败，请稍后重试')
     } finally {
       setLoading(false)
     }
