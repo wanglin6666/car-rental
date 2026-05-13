@@ -229,13 +229,41 @@ export const useStore = create<AppState>()((set, get) => {
     currentUser: null,
     admins: [],
     currentAdmin: null,
-    brands: [],
-    colors: [],
-    cars: [],
+    // Seed data so page shows content before Supabase responds
+    brands: [
+      { id: 'b1', name: '丰田', logo: '🚗' },
+      { id: 'b2', name: '本田', logo: '🚙' },
+      { id: 'b3', name: '大众', logo: '🚘' },
+      { id: 'b4', name: '宝马', logo: '🏎️' },
+      { id: 'b5', name: '奔驰', logo: '🚖' },
+      { id: 'b6', name: '比亚迪', logo: '⚡' },
+    ],
+    colors: [
+      { id: 'c1', name: '珍珠白', value: '#FAFAFA' },
+      { id: 'c2', name: '曜石黑', value: '#1A1A1A' },
+      { id: 'c3', name: '星空银', value: '#C0C0C0' },
+      { id: 'c4', name: '极光蓝', value: '#4169E1' },
+      { id: 'c5', name: '烈焰红', value: '#DC143C' },
+    ],
+    cars: [
+      { id: 'car1', brandId: 'b1', colorId: 'c1', name: '卡罗拉 2024款', plateNumber: '京A·88888', dailyPrice: 200, deposit: 3000, image: 'https://images.unsplash.com/photo-1550355291-bbee04a92027?w=600', description: '经济实惠，省油耐用。', status: 'available' as CarStatus, createdAt: now() },
+      { id: 'car2', brandId: 'b1', colorId: 'c3', name: '凯美瑞 2024款', plateNumber: '京A·66666', dailyPrice: 350, deposit: 5000, image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=600', description: '中型轿车，舒适平稳。', status: 'available' as CarStatus, createdAt: now() },
+      { id: 'car3', brandId: 'b4', colorId: 'c2', name: '宝马3系 2024款', plateNumber: '京B·12345', dailyPrice: 600, deposit: 10000, image: 'https://images.unsplash.com/photo-1555215695-3004980ad54e?w=600', description: '豪华运动轿车。', status: 'available' as CarStatus, createdAt: now() },
+      { id: 'car4', brandId: 'b5', colorId: 'c4', name: '奔驰C级 2024款', plateNumber: '京B·99999', dailyPrice: 650, deposit: 10000, image: 'https://images.unsplash.com/photo-1617531653332-bd46c24f2068?w=600', description: '德系豪华，内饰精致。', status: 'available' as CarStatus, createdAt: now() },
+      { id: 'car5', brandId: 'b6', colorId: 'c5', name: '汉EV 创世版', plateNumber: '京C·16888', dailyPrice: 400, deposit: 6000, image: 'https://images.unsplash.com/photo-1606016159991-dfe4f2746ea5?w=600', description: '纯电轿车，科技感十足。', status: 'available' as CarStatus, createdAt: now() },
+      { id: 'car6', brandId: 'b2', colorId: 'c1', name: '思域 2024款', plateNumber: '京D·33333', dailyPrice: 280, deposit: 4000, image: 'https://images.unsplash.com/photo-1590362891991-f776e747a588?w=600', description: '运动风格轿车。', status: 'maintenance' as CarStatus, createdAt: now() },
+    ],
     orders: [],
     returnRecords: [],
-    carousels: [],
-    announcements: [],
+    carousels: [
+      { id: 's1', image: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=1200', link: '/cars', sort: 1, isActive: true },
+      { id: 's2', image: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=1200', link: '/cars', sort: 2, isActive: true },
+      { id: 's3', image: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=1200', link: '/cars', sort: 3, isActive: true },
+    ],
+    announcements: [
+      { id: 'a1', title: '新车上线通知', content: '2024款宝马3系、奔驰C级已到店，欢迎前来体验租赁！', isActive: true, createdAt: now() },
+      { id: 'a2', title: '暑期优惠活动', content: '即日起至8月31日，租满7天享9折优惠，租满30天享8折优惠！', isActive: true, createdAt: now() },
+    ],
     favorites: [],
     initialized: false,
 
@@ -288,7 +316,7 @@ export const useStore = create<AppState>()((set, get) => {
         try { const { data } = await query; return data } catch (_) { return null }
       }
 
-      const [br, cl, ca, cs, an, fv, od, rr, ad, pf] = await Promise.all([
+      const results = await Promise.allSettled([
         safeLoad(supabase.from('brands').select('*').order('created_at')),
         safeLoad(supabase.from('colors').select('*').order('created_at')),
         safeLoad(supabase.from('cars').select('*').order('created_at')),
@@ -301,15 +329,20 @@ export const useStore = create<AppState>()((set, get) => {
         safeLoad(supabase.from('profiles').select('*')),
       ])
 
-      if (br) set({ brands: br.map(mapBrand) })
-      if (cl) set({ colors: cl.map(mapColor) })
-      if (ca) set({ cars: ca.map(mapCar) })
-      if (cs) set({ carousels: cs.map(mapCarousel) })
-      if (an) set({ announcements: an.map(mapAnnouncement) })
+      const [br, cl, ca, cs, an, fv, od, rr, ad, pf] = results.map(r =>
+        r.status === 'fulfilled' ? r.value : null
+      )
+
+      // Only overwrite seed data if Supabase returns actual data
+      if (br && br.length) set({ brands: br.map(mapBrand) })
+      if (cl && cl.length) set({ colors: cl.map(mapColor) })
+      if (ca && ca.length) set({ cars: ca.map(mapCar) })
+      if (cs && cs.length) set({ carousels: cs.map(mapCarousel) })
+      if (an && an.length) set({ announcements: an.map(mapAnnouncement) })
       if (fv) set({ favorites: fv.map(mapFavorite) })
       if (od) set({ orders: od.map(mapOrder) })
       if (rr) set({ returnRecords: rr.map(mapReturnRecord) })
-      if (ad) set({ admins: ad.map(mapAdmin) })
+      if (ad && ad.length) set({ admins: ad.map(mapAdmin) })
       if (pf) set({ users: pf.map(mapProfile) })
     },
 
