@@ -240,94 +240,77 @@ export const useStore = create<AppState>()((set, get) => {
     initialized: false,
 
     init: async () => {
-      // Safety timeout: show UI even if Supabase is slow
-      const safetyTimer = setTimeout(() => {
-        const s = get()
-        if (!s.initialized) {
-          // Restore admin session before showing UI
-          try {
-            const saved = localStorage.getItem('car_rental_admin')
-            if (saved) set({ currentAdmin: JSON.parse(saved) })
-          } catch (_) {}
-          set({ initialized: true })
-        }
-      }, 5000)
-
+      // Show page immediately, load data in background
       try {
-        const safeLoad = async (query: any) => {
-          try { const { data } = await query; return data } catch (_) { return null }
-        }
-
-        const [br, cl, ca, cs, an, fv, od, rr, ad, pf] = await Promise.all([
-          safeLoad(supabase.from('brands').select('*').order('created_at')),
-          safeLoad(supabase.from('colors').select('*').order('created_at')),
-          safeLoad(supabase.from('cars').select('*').order('created_at')),
-          safeLoad(supabase.from('carousels').select('*').order('sort')),
-          safeLoad(supabase.from('announcements').select('*').order('created_at', { ascending: false })),
-          safeLoad(supabase.from('favorites').select('*')),
-          safeLoad(supabase.from('orders').select('*').order('created_at', { ascending: false })),
-          safeLoad(supabase.from('return_records').select('*').order('created_at', { ascending: false })),
-          safeLoad(supabase.from('admins').select('*')),
-          safeLoad(supabase.from('profiles').select('*')),
-        ])
-
-        if (br) set({ brands: br.map(mapBrand) })
-        if (cl) set({ colors: cl.map(mapColor) })
-        if (ca) set({ cars: ca.map(mapCar) })
-        if (cs) set({ carousels: cs.map(mapCarousel) })
-        if (an) set({ announcements: an.map(mapAnnouncement) })
-        if (fv) set({ favorites: fv.map(mapFavorite) })
-        if (od) set({ orders: od.map(mapOrder) })
-        if (rr) set({ returnRecords: rr.map(mapReturnRecord) })
-        if (ad) set({ admins: ad.map(mapAdmin) })
-        if (pf) set({ users: pf.map(mapProfile) })
-
-        // Restore admin session
-        try {
-          const saved = localStorage.getItem('car_rental_admin')
-          if (saved) set({ currentAdmin: JSON.parse(saved) })
-        } catch (_) {}
-
-        // Restore Supabase Auth session
-        try {
-          const { data: { session } } = await supabase.auth.getSession()
-          if (session?.user) {
-            set({
-              currentUser: {
-                id: session.user.id,
-                phone: session.user.user_metadata?.phone ?? '',
-                email: session.user.email ?? '',
-                password: '',
-                name: session.user.user_metadata?.name ?? '用户',
-                avatar: '',
-                createdAt: session.user.created_at,
-              },
-            })
-          }
-        } catch (_) {}
-
-        // Listen for auth changes
-        supabase.auth.onAuthStateChange(async (_event, session) => {
-          if (session?.user) {
-            set({
-              currentUser: {
-                id: session.user.id,
-                phone: session.user.user_metadata?.phone ?? '',
-                email: session.user.email ?? '',
-                password: '',
-                name: session.user.user_metadata?.name ?? '用户',
-                avatar: '',
-                createdAt: session.user.created_at,
-              },
-            })
-          } else {
-            set({ currentUser: null })
-          }
-        })
+        const saved = localStorage.getItem('car_rental_admin')
+        if (saved) set({ currentAdmin: JSON.parse(saved) })
       } catch (_) {}
 
-      clearTimeout(safetyTimer)
-      if (!get().initialized) set({ initialized: true })
+      // Restore Supabase Auth session synchronously if possible
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          set({
+            currentUser: {
+              id: session.user.id,
+              phone: session.user.user_metadata?.phone ?? '',
+              email: session.user.email ?? '',
+              password: '',
+              name: session.user.user_metadata?.name ?? '用户',
+              avatar: '',
+              createdAt: session.user.created_at,
+            },
+          })
+        }
+      }).catch(() => {})
+
+      supabase.auth.onAuthStateChange(async (_event, session) => {
+        if (session?.user) {
+          set({
+            currentUser: {
+              id: session.user.id,
+              phone: session.user.user_metadata?.phone ?? '',
+              email: session.user.email ?? '',
+              password: '',
+              name: session.user.user_metadata?.name ?? '用户',
+              avatar: '',
+              createdAt: session.user.created_at,
+            },
+          })
+        } else {
+          set({ currentUser: null })
+        }
+      })
+
+      set({ initialized: true })
+
+      // Load data in background
+      const safeLoad = async (query: any) => {
+        try { const { data } = await query; return data } catch (_) { return null }
+      }
+
+      const [br, cl, ca, cs, an, fv, od, rr, ad, pf] = await Promise.all([
+        safeLoad(supabase.from('brands').select('*').order('created_at')),
+        safeLoad(supabase.from('colors').select('*').order('created_at')),
+        safeLoad(supabase.from('cars').select('*').order('created_at')),
+        safeLoad(supabase.from('carousels').select('*').order('sort')),
+        safeLoad(supabase.from('announcements').select('*').order('created_at', { ascending: false })),
+        safeLoad(supabase.from('favorites').select('*')),
+        safeLoad(supabase.from('orders').select('*').order('created_at', { ascending: false })),
+        safeLoad(supabase.from('return_records').select('*').order('created_at', { ascending: false })),
+        safeLoad(supabase.from('admins').select('*')),
+        safeLoad(supabase.from('profiles').select('*')),
+      ])
+
+      if (br) set({ brands: br.map(mapBrand) })
+      if (cl) set({ colors: cl.map(mapColor) })
+      if (ca) set({ cars: ca.map(mapCar) })
+      if (cs) set({ carousels: cs.map(mapCarousel) })
+      if (an) set({ announcements: an.map(mapAnnouncement) })
+      if (fv) set({ favorites: fv.map(mapFavorite) })
+      if (od) set({ orders: od.map(mapOrder) })
+      if (rr) set({ returnRecords: rr.map(mapReturnRecord) })
+      if (ad) set({ admins: ad.map(mapAdmin) })
+      if (pf) set({ users: pf.map(mapProfile) })
     },
 
     // ================ AUTH ================
