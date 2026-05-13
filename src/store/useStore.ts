@@ -292,6 +292,12 @@ export const useStore = create<AppState>()((set, get) => {
           }
         })
 
+        // Restore admin session from localStorage
+        try {
+          const savedAdmin = localStorage.getItem('car_rental_admin')
+          if (savedAdmin) set({ currentAdmin: JSON.parse(savedAdmin) })
+        } catch (_) { /* ignore */ }
+
         setupRealtime()
       } catch (_e) {
         // Even if initialisation partially fails, allow the UI to render
@@ -363,10 +369,15 @@ export const useStore = create<AppState>()((set, get) => {
       const admin = get().admins.find(a => a.username === username && a.password_hash === hash)
       if (!admin) return { ok: false, msg: '账号或密码错误' }
       set({ currentAdmin: admin })
+      // Persist admin session so refresh doesn't log out
+      localStorage.setItem('car_rental_admin', JSON.stringify(admin))
       return { ok: true, msg: '登录成功' }
     },
 
-    adminLogout: () => set({ currentAdmin: null }),
+    adminLogout: () => {
+      localStorage.removeItem('car_rental_admin')
+      set({ currentAdmin: null })
+    },
 
     // ================ BRAND ================
     addBrand: async (name, logo) => {
