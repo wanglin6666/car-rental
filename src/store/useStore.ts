@@ -344,6 +344,18 @@ export const useStore = create<AppState>()((set, get) => {
       if (rr) set({ returnRecords: rr.map(mapReturnRecord) })
       if (ad && ad.length) set({ admins: ad.map(mapAdmin) })
       if (pf) set({ users: pf.map(mapProfile) })
+
+      // Auto-refresh every 10 seconds to keep data in sync across users
+      setInterval(async () => {
+        const o = await safeLoad(supabase.from('orders').select('*').order('created_at', { ascending: false }))
+        const r = await safeLoad(supabase.from('return_records').select('*').order('created_at', { ascending: false }))
+        const c = await safeLoad(supabase.from('cars').select('*').order('created_at'))
+        const u = await safeLoad(supabase.from('profiles').select('*'))
+        if (o) set({ orders: o.map(mapOrder) })
+        if (r) set({ returnRecords: r.map(mapReturnRecord) })
+        if (c) set({ cars: c.map(mapCar) })
+        if (u) set({ users: u.map(mapProfile) })
+      }, 10000)
     },
 
     // ================ AUTH ================
