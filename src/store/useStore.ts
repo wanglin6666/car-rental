@@ -240,24 +240,45 @@ export const useStore = create<AppState>()((set, get) => {
     initialized: false,
 
     init: async () => {
+      // -- Load each table independently so one failure doesn't block the rest --
+      const safeLoad = async (query: any) => {
+        try { const { data } = await query; return data } catch (_) { return null }
+      }
+
+      const [br, cl, ca, cs, an, fv, od, rr, ad, pf] = await Promise.all([
+        safeLoad(supabase.from('brands').select('*').order('created_at')),
+        safeLoad(supabase.from('colors').select('*').order('created_at')),
+        safeLoad(supabase.from('cars').select('*').order('created_at')),
+        safeLoad(supabase.from('carousels').select('*').order('sort')),
+        safeLoad(supabase.from('announcements').select('*').order('created_at', { ascending: false })),
+        safeLoad(supabase.from('favorites').select('*')),
+        safeLoad(supabase.from('orders').select('*').order('created_at', { ascending: false })),
+        safeLoad(supabase.from('return_records').select('*').order('created_at', { ascending: false })),
+        safeLoad(supabase.from('admins').select('*')),
+        safeLoad(supabase.from('profiles').select('*')),
+      ])
+
+      if (br) set({ brands: br.map(mapBrand) })
+      if (cl) set({ colors: cl.map(mapColor) })
+      if (ca) set({ cars: ca.map(mapCar) })
+      if (cs) set({ carousels: cs.map(mapCarousel) })
+      if (an) set({ announcements: an.map(mapAnnouncement) })
+      if (fv) set({ favorites: fv.map(mapFavorite) })
+      if (od) set({ orders: od.map(mapOrder) })
+      if (rr) set({ returnRecords: rr.map(mapReturnRecord) })
+      if (ad) set({ admins: ad.map(mapAdmin) })
+      if (pf) set({ users: pf.map(mapProfile) })
+
+      // -- Restore admin session from localStorage (ALWAYS runs, even if queries fail) --
       try {
-        const [br, cl, ca, cs, an, fv, od, rr, ad, pf] = await loadAll()
+        const savedAdmin = localStorage.getItem('car_rental_admin')
+        if (savedAdmin) set({ currentAdmin: JSON.parse(savedAdmin) })
+      } catch (_) { /* ignore */ }
 
-        if (br.data) set({ brands: br.data.map(mapBrand) })
-        if (cl.data) set({ colors: cl.data.map(mapColor) })
-        if (ca.data) set({ cars: ca.data.map(mapCar) })
-        if (cs.data) set({ carousels: cs.data.map(mapCarousel) })
-        if (an.data) set({ announcements: an.data.map(mapAnnouncement) })
-        if (fv.data) set({ favorites: fv.data.map(mapFavorite) })
-        if (od.data) set({ orders: od.data.map(mapOrder) })
-        if (rr.data) set({ returnRecords: rr.data.map(mapReturnRecord) })
-        if (ad.data) set({ admins: ad.data.map(mapAdmin) })
-        if (pf.data) set({ users: pf.data.map(mapProfile) })
-
-        // Restore Supabase Auth session
+      // -- Restore Supabase Auth session --
+      try {
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user) {
-          // User is already logged in; profile might be in-memory from the loadAll above
           const phone = session.user.user_metadata?.phone ?? ''
           set({
             currentUser: {
@@ -271,37 +292,31 @@ export const useStore = create<AppState>()((set, get) => {
             },
           })
         }
+      } catch (_) { /* ignore */ }
 
-        // Listen for auth changes
-        supabase.auth.onAuthStateChange(async (_event, session) => {
-          if (session?.user) {
-            const phone = session.user.user_metadata?.phone ?? ''
-            set({
-              currentUser: {
-                id: session.user.id,
-                phone,
-                email: session.user.email ?? '',
-                password: '',
-                name: session.user.user_metadata?.name ?? phone,
-                avatar: '',
-                createdAt: session.user.created_at,
-              },
-            })
-          } else {
-            set({ currentUser: null })
-          }
-        })
+      // -- Listen for auth changes --
+      supabase.auth.onAuthStateChange(async (_event, session) => {
+        if (session?.user) {
+          const phone = session.user.user_metadata?.phone ?? ''
+          set({
+            currentUser: {
+              id: session.user.id,
+              phone,
+              email: session.user.email ?? '',
+              password: '',
+              name: session.user.user_metadata?.name ?? phone,
+              avatar: '',
+              createdAt: session.user.created_at,
+            },
+          })
+        } else {
+          set({ currentUser: null })
+        }
+      })
 
-        // Restore admin session from localStorage
-        try {
-          const savedAdmin = localStorage.getItem('car_rental_admin')
-          if (savedAdmin) set({ currentAdmin: JSON.parse(savedAdmin) })
-        } catch (_) { /* ignore */ }
+      // -- Setup realtime --
+      try { setupRealtime() } catch (_) { /* ignore */ }
 
-        setupRealtime()
-      } catch (_e) {
-        // Even if initialisation partially fails, allow the UI to render
-      }
       set({ initialized: true })
     },
 
