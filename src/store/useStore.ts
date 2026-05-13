@@ -240,76 +240,80 @@ export const useStore = create<AppState>()((set, get) => {
     initialized: false,
 
     init: async () => {
-      const [br, cl, ca, cs, an, fv, od, rr, ad, pf] = await loadAll()
+      try {
+        const [br, cl, ca, cs, an, fv, od, rr, ad, pf] = await loadAll()
 
-      if (br.data) set({ brands: br.data.map(mapBrand) })
-      if (cl.data) set({ colors: cl.data.map(mapColor) })
-      if (ca.data) set({ cars: ca.data.map(mapCar) })
-      if (cs.data) set({ carousels: cs.data.map(mapCarousel) })
-      if (an.data) set({ announcements: an.data.map(mapAnnouncement) })
-      if (fv.data) set({ favorites: fv.data.map(mapFavorite) })
-      if (od.data) set({ orders: od.data.map(mapOrder) })
-      if (rr.data) set({ returnRecords: rr.data.map(mapReturnRecord) })
-      if (ad.data) set({ admins: ad.data.map(mapAdmin) })
-      if (pf.data) set({ users: pf.data.map(mapProfile) })
+        if (br.data) set({ brands: br.data.map(mapBrand) })
+        if (cl.data) set({ colors: cl.data.map(mapColor) })
+        if (ca.data) set({ cars: ca.data.map(mapCar) })
+        if (cs.data) set({ carousels: cs.data.map(mapCarousel) })
+        if (an.data) set({ announcements: an.data.map(mapAnnouncement) })
+        if (fv.data) set({ favorites: fv.data.map(mapFavorite) })
+        if (od.data) set({ orders: od.data.map(mapOrder) })
+        if (rr.data) set({ returnRecords: rr.data.map(mapReturnRecord) })
+        if (ad.data) set({ admins: ad.data.map(mapAdmin) })
+        if (pf.data) set({ users: pf.data.map(mapProfile) })
 
-      // Restore Supabase Auth session
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-        if (profile) {
+        // Restore Supabase Auth session
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user) {
+          // User is already logged in; profile might be in-memory from the loadAll above
+          const phone = session.user.user_metadata?.phone ?? ''
           set({
             currentUser: {
-              ...mapProfile(profile),
+              id: session.user.id,
+              phone,
               email: session.user.email ?? '',
+              password: '',
+              name: session.user.user_metadata?.name ?? phone,
+              avatar: '',
+              createdAt: session.user.created_at,
             },
           })
         }
-      }
 
-      // Listen for auth changes
-      supabase.auth.onAuthStateChange(async (_event, session) => {
-        if (session?.user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
-          if (profile) {
+        // Listen for auth changes
+        supabase.auth.onAuthStateChange(async (_event, session) => {
+          if (session?.user) {
+            const phone = session.user.user_metadata?.phone ?? ''
             set({
               currentUser: {
-                ...mapProfile(profile),
+                id: session.user.id,
+                phone,
                 email: session.user.email ?? '',
+                password: '',
+                name: session.user.user_metadata?.name ?? phone,
+                avatar: '',
+                createdAt: session.user.created_at,
               },
             })
+          } else {
+            set({ currentUser: null })
           }
-        } else {
-          set({ currentUser: null })
-        }
-      })
+        })
 
-      setupRealtime()
+        setupRealtime()
+      } catch (_e) {
+        // Even if initialisation partially fails, allow the UI to render
+      }
       set({ initialized: true })
     },
 
     // ================ AUTH ================
-    register: async (phone, email, password, name) => {
+    register: async (phone, _email, password, name) => {
+      const authEmail = `${phone}@carrental.local`
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: authEmail,
         password,
         options: { data: { phone, name } },
       })
       if (error) {
         const msg = error.message === 'User already registered'
-          ? '该邮箱已被注册'
+          ? '该手机号已被注册'
           : error.message
         return { ok: false, msg }
       }
-      // Manually insert profile (since we removed the DB trigger)
+      // Manually insert profile
       if (data.user) {
         await supabase.from('profiles').upsert({
           id: data.user.id,
@@ -321,9 +325,10 @@ export const useStore = create<AppState>()((set, get) => {
     },
 
     login: async (account, password) => {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: account, password })
+      const authEmail = account.includes('@') ? account : `${account}@carrental.local`
+      const { data, error } = await supabase.auth.signInWithPassword({ email: authEmail, password })
       if (error) {
-        return { ok: false, msg: '账号或密码错误' }
+        return { ok: false, msg: '手机号或密码错误' }
       }
       return { ok: true, msg: '登录成功' }
     },

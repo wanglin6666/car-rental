@@ -4,7 +4,6 @@ import { useStore } from '../../store/useStore'
 
 export default function Register() {
   const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -15,16 +14,12 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!phone.trim() || !email.trim() || !name.trim() || !password.trim()) {
+    if (!phone.trim() || !name.trim() || !password.trim()) {
       setMsg('请填写所有必填项')
       return
     }
     if (!/^1[3-9]\d{9}$/.test(phone.trim())) {
       setMsg('请输入正确的手机号')
-      return
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setMsg('请输入正确的邮箱地址')
       return
     }
     if (password.length < 6) {
@@ -38,10 +33,10 @@ export default function Register() {
     setLoading(true)
     setMsg('')
     try {
-      const result = await register(phone.trim(), email.trim(), password, name.trim())
+      const result = await register(phone.trim(), '', password, name.trim())
       setMsg(result.msg)
       if (result.ok) {
-        setTimeout(() => navigate('/login'), 1500)
+        setTimeout(() => navigate('/login'), 1000)
       }
     } finally {
       setLoading(false)
@@ -64,11 +59,6 @@ export default function Register() {
               value={phone} onChange={e => setPhone(e.target.value)} />
           </div>
           <div className="form-group">
-            <label className="form-label">邮箱 *</label>
-            <input className="form-input" type="email" placeholder="请输入邮箱地址"
-              value={email} onChange={e => setEmail(e.target.value)} />
-          </div>
-          <div className="form-group">
             <label className="form-label">密码 *</label>
             <input className="form-input" type="password" placeholder="至少6位密码"
               value={password} onChange={e => setPassword(e.target.value)} />
@@ -85,9 +75,6 @@ export default function Register() {
         </form>
         <p style={{ textAlign: 'center', marginTop: 16, fontSize: 14, color: 'var(--text-muted)' }}>
           已有账号？<Link to="/login" style={{ color: 'var(--primary)' }}>去登录</Link>
-        </p>
-        <p style={{ textAlign: 'center', marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
-          提示：如果 Supabase 开启了邮箱验证，注册后请查看邮箱，或在 Supabase 面板关闭邮件确认
         </p>
       </div>
     </div>

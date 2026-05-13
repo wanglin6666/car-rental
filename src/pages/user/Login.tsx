@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/useStore'
 
 export default function Login() {
-  const [account, setAccount] = useState('')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
@@ -12,18 +12,18 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!account.trim() || !password.trim()) {
-      setMsg('请填写账号和密码')
+    if (!phone.trim() || !password.trim()) {
+      setMsg('请填写手机号和密码')
       return
     }
-    if (!account.includes('@')) {
-      setMsg('请使用邮箱登录')
+    if (!/^1[3-9]\d{9}$/.test(phone.trim())) {
+      setMsg('请输入正确的手机号')
       return
     }
     setLoading(true)
     setMsg('')
     try {
-      const result = await login(account.trim(), password)
+      const result = await login(phone.trim(), password)
       setMsg(result.msg)
       if (result.ok) navigate('/')
     } finally {
@@ -37,9 +37,9 @@ export default function Login() {
         <h2 style={{ textAlign: 'center', marginBottom: 24 }}>用户登录</h2>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">邮箱</label>
-            <input className="form-input" type="email" placeholder="请输入邮箱"
-              value={account} onChange={e => setAccount(e.target.value)} />
+            <label className="form-label">手机号</label>
+            <input className="form-input" type="text" placeholder="请输入11位手机号"
+              value={phone} onChange={e => setPhone(e.target.value)} />
           </div>
           <div className="form-group">
             <label className="form-label">密码</label>
